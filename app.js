@@ -12,6 +12,8 @@ var usersRouter = require('./routes/users');
 var app = express();
 
 const User = require("./model/User");
+const bcrypt = require("bcryptjs/dist/bcrypt");
+const jwt = require("jsonwebtoken");
 
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
@@ -26,8 +28,41 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/', indexRouter);
 app.use('/users', usersRouter);
 
-app.post("/register", (req, res) => {
+app.post("/register", async (req, res) => {
+  try {
+    const {userName, password, name} = req.body;
+    if (!(userName && password && name)) {
+      res.status(400).send("All input is required");
+    }
 
+    const oldUser = await User.findOne({ userName });
+
+    if (oldUser) {
+      return res.status(400).send("User already exist, please login!");
+    }
+
+    encryptedPassword = await bcrypt.hash(password, 10);
+
+    const user = await User.create({
+      userName,
+      name,
+      password : encryptedPassword
+    });
+
+    const token = jwt.sign(
+      { user_id : user._id, userName : userName },
+        process.env.TOKEN_KEY,
+      {
+        expiresIn : "2h"
+      }
+    );
+
+    user.token = token;
+
+    res.status(201).json(user);
+  } catch (err) {
+    console.log(err);
+  }
 });
 
 app.post("/login", (req, res) => {
